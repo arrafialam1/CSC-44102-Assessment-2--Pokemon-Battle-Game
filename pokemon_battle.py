@@ -1,6 +1,7 @@
 # I acknowledge the use of Microsoft Copilot (M365 Copilot, Microsoft, https://copilot.microsoft.com/) to co-create code in this file.
 
 import random
+import tkinter as tk
 import json
 import os
 from dataclasses import dataclass
@@ -35,6 +36,7 @@ EFFECT = {
     ("Fire", "Grass"): 2.0, ("Grass", "Water"): 2.0, ("Water", "Fire"): 2.0,
     ("Grass", "Fire"): 0.5, ("Water", "Grass"): 0.5, ("Fire", "Water"): 0.5,
 }
+
 def type_multiplier(att_type: str, def_type: str) -> float:
     return EFFECT.get((att_type, def_type), 1.0)
 
@@ -42,14 +44,12 @@ def type_multiplier(att_type: str, def_type: str) -> float:
 def clamp(n: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, n))
 
-
 def clone_pokemon(template: Pokemon) -> Pokemon:
     return Pokemon(template.name, template.ptype, template.max_hp, template.max_hp, list(template.moves))
 
-
 def deal_damage(attacker: Pokemon, defender: Pokemon, move: Move) -> dict:
     if random.randint(1, 100) > move.accuracy:
-        return {"missed": True, "damage": 0, "crit": False, "mult": 1.0, "recoil": 0}
+        return {"missed": True, "damage": 0, "crit": False, "mult": 1.0}
 
     base = move.power + random.randint(-2, 2)
     mult = type_multiplier(move.mtype, defender.ptype)
@@ -60,128 +60,85 @@ def deal_damage(attacker: Pokemon, defender: Pokemon, move: Move) -> dict:
     dmg = max(1, int(base * mult)) if move.power > 0 else 0
     defender.hp = clamp(defender.hp - dmg, 0, defender.max_hp)
 
-    # Recoil mechanic: high-power moves (≥14) have 15% chance of 20% recoil
-    recoil = 0
-    if move.power >= 14 and dmg > 0 and random.random() < 0.15:
-        recoil = max(1, int(dmg * 0.20))
-        attacker.hp = clamp(attacker.hp - recoil, 0, attacker.max_hp)
-
-    return {"missed": False, "damage": dmg, "crit": crit, "mult": mult, "recoil": recoil}
+    return {"missed": False, "damage": dmg, "crit": crit, "mult": mult}
 
 def choose_enemy_move(p: Pokemon) -> Move:
     weighted = [m for m in p.moves for _ in (range(2) if m.mtype != "Normal" else range(1))]
     return random.choice(weighted)
 
-# ---------- CLI ----------
-def describe_damage(origin: Pokemon, move: Move, report: dict, target_label: str) -> None:
-    if report["missed"]:
-        print(f"{origin.name} used {move.name}, but it missed {target_label}!")
-        return
+# ---------- GUI ----------
+class BattleApp:
+    def __init__(self, root: tk.Tk) -> None:
+        self.root = root
+        root.title("Pokemon Battle - Best of 3")
+        root.resizable(False, False)
 
-    parts: List[str] = []
-    if report["crit"]:
-        parts.append("critical hit")
-    if report["mult"] > 1.0:
-        parts.append("super effective")
-    if 0 < report["mult"] < 1.0:
-        parts.append("not very effective")
-    extra = f" ({', '.join(parts)})" if parts else ""
-    print(f"{origin.name} used {move.name}! It dealt {report['damage']} damage{extra} to {target_label}.")
-    
-    if report.get("recoil", 0) > 0:
-        print(f"  {origin.name} took {report['recoil']} recoil damage!")
+        # Match state
+        self.player_wins = 0
+        self.enemy_wins = 0
+        self.round_num = 0
+        self.player_template = None  # chosen Pokemon template for the match
 
+        # Persistent record
+        self.record = self.load_record()
 
-def print_status(player: Pokemon, enemy: Pokemon) -> None:
-    print()
-    print(f"You:   {player.name:<10} [{player.ptype}] {player.hp}/{player.max_hp} HP")
-    print(f"Foe:   {enemy.name:<10} [{enemy.ptype}] {enemy.hp}/{enemy.max_hp} HP")
+        # Title and Score
+        self.lbl_title = tk.Label(root, text="", font=("Arial", 14, "bold"), fg="#2c3e50")
+        self.lbl_title.pack(pady=(10, 0))
+        
+        self.lbl_score = tk.Label(root, text="", font=("Arial", 12, "italic"), fg="#34495e")
+        self.lbl_score.pack(pady=(0, 10))
 
+        # Record label
+        self.lbl_record = tk.Label(root, text="", font=("Arial", 11), fg="#7f8c8d")
+        self.lbl_record.pack(pady=(0, 6))
 
-def prompt_pokemon_choice() -> Pokemon:
-    print("Choose your Pokémon:")
-    for idx, mon in enumerate(ROSTER, start=1):
-        moves = ", ".join(move.name for move in mon.moves)
-        print(f" {idx}. {mon.name:<10} [{mon.ptype}] HP {mon.max_hp} | Moves: {moves}")
+        # HP Display
+        hp_frame = tk.Frame(root)
+        hp_frame.pack(pady=5)
+        
+        self.lbl_player_hp = tk.Label(hp_frame, text="", font=("Courier", 11), fg="#e74c3c", anchor="w", width=40)
+        self.lbl_player_hp.pack()
+        
+        self.lbl_enemy_hp = tk.Label(hp_frame, text="", font=("Courier", 11), fg="#3498db", anchor="w", width=40)
+        self.lbl_enemy_hp.pack()
 
-    while True:
-        choice = input("> ").strip()
-        if choice.isdigit():
-            index = int(choice) - 1
-            if 0 <= index < len(ROSTER):
-                return ROSTER[index]
-        print("Invalid choice. Enter the number of the Pokémon you want to use.")
+        # Battle log
+        self.txt_log = tk.Text(root, height=10, width=50, wrap=tk.WORD, state=tk.DISABLED,
+                               font=("Arial", 10), bg="#ecf0f1")
+        self.txt_log.pack(pady=10, padx=10)
 
+        # Move buttons
+        btn_frame = tk.Frame(root)
+        btn_frame.pack(pady=5)
+        
+        self.move_buttons: List[tk.Button] = []
+        # Create buttons once, we'll update them
+        for i in range(len(ROSTER[0].moves)):
+            btn = tk.Button(btn_frame, text="", command=lambda idx=i: self.on_move_click(idx),
+                          width=15, height=3, font=("Arial", 9))
+            btn.grid(row=0, column=i, padx=5)
+            self.move_buttons.append(btn)
 
-def prompt_move(player: Pokemon) -> Move:
-    while True:
-        print("Choose your move:")
-        for idx, move in enumerate(player.moves, start=1):
-            print(f" {idx}. {move.name} ({move.mtype}, power {move.power}, acc {move.accuracy}%)")
-        choice = input("> ").strip()
-        if choice.isdigit():
-            index = int(choice) - 1
-            if 0 <= index < len(player.moves):
-                return player.moves[index]
-        print("Invalid choice. Please enter the number of the move you want to use.")
+        # Restart button
+        self.btn_restart = tk.Button(root, text="New Match", command=self.restart,
+                                     width=20, font=("Arial", 10, "bold"), bg="#27ae60", fg="white")
+        self.btn_restart.pack(pady=10)
 
+        self.update_record_label()
+        self.restart()
 
-def player_turn(player: Pokemon, enemy: Pokemon) -> bool:
-    move = prompt_move(player)
-    result = deal_damage(player, enemy, move)
-    describe_damage(player, move, result, f"the wild {enemy.name}")
-    return enemy.hp <= 0
-
-
-def enemy_turn(player: Pokemon, enemy: Pokemon) -> bool:
-    move = choose_enemy_move(enemy)
-    result = deal_damage(enemy, player, move)
-    describe_damage(enemy, move, result, player.name)
-    return player.hp <= 0
-
-
-def battle(player: Pokemon, enemy: Pokemon) -> str:
-    print(f"A wild {enemy.name} appeared!")
-    print(f"Go! {player.name}!")
-
-    while player.hp > 0 and enemy.hp > 0:
-        print_status(player, enemy)
-        if player_turn(player, enemy):
-            break
-        if enemy.hp <= 0:
-            break
-        if enemy_turn(player, enemy):
-            break
-
-    if player.hp <= 0 and enemy.hp <= 0:
-        print("Both Pokémon fainted. It's a tie!")
-        return "tie"
-    if enemy.hp <= 0:
-        print(f"The wild {enemy.name} fainted. You win!")
-        return "win"
-
-    print(f"{player.name} fainted. You lost!")
-    return "loss"
-
-
-def create_combatants() -> Tuple[Pokemon, Pokemon]:
-    player_template = prompt_pokemon_choice()
-    enemy_pool = [mon for mon in ROSTER if mon is not player_template]
-    enemy_template = random.choice(enemy_pool or ROSTER)
-    return clone_pokemon(player_template), clone_pokemon(enemy_template)
-
-
-def main() -> None:
-    # Load persistent record (stored next to data/pokedex_min.json)
-    def record_path() -> str:
+    # ---------- Persistence ----------
+    def record_path(self) -> str:
         base = os.path.dirname(__file__)
-        data_dir = os.path.join(base, "data")
+        data_dir = os.path.join(base, "..", "data")
+        data_dir = os.path.abspath(data_dir)
         os.makedirs(data_dir, exist_ok=True)
         return os.path.join(data_dir, "record.json")
 
-    def load_record() -> dict:
+    def load_record(self) -> dict:
         try:
-            with open(record_path(), "r", encoding="utf-8") as f:
+            with open(self.record_path(), "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
                     return {"wins": int(data.get("wins", 0)), "losses": int(data.get("losses", 0)), "ties": int(data.get("ties", 0))}
@@ -189,40 +146,185 @@ def main() -> None:
             pass
         return {"wins": 0, "losses": 0, "ties": 0}
 
-    def save_record(rec: dict) -> None:
+    def save_record(self) -> None:
         try:
-            with open(record_path(), "w", encoding="utf-8") as f:
-                json.dump(rec, f)
+            with open(self.record_path(), "w", encoding="utf-8") as f:
+                json.dump(self.record, f)
         except Exception:
-            # Non-fatal: just continue without crashing the game
             pass
 
-    rec = load_record()
-    wins, losses, ties = rec["wins"], rec["losses"], rec["ties"]
+    def update_record_label(self) -> None:
+        self.lbl_record.config(text=f"Record: {self.record['wins']}W/{self.record['losses']}L/{self.record['ties']}T")
 
-    while True:
-        player, enemy = create_combatants()
-        outcome = battle(player, enemy)
+    def start_new_round(self) -> None:
+        self.round_num += 1
+        
+        # Use chosen template for the whole match
+        player_template = self.player_template or random.choice(ROSTER)
+        # Enemy should not be the same species if possible
+        enemy_candidates = [m for m in ROSTER if m.name != player_template.name] or ROSTER
+        enemy_template = random.choice(enemy_candidates)
 
-        if outcome == "win":
-            wins += 1
-        elif outcome == "loss":
-            losses += 1
+        self.player: Pokemon = clone_pokemon(player_template)
+        self.enemy: Pokemon = clone_pokemon(enemy_template)
+
+        self.lbl_title.config(text=f"Round {self.round_num} - A wild {self.enemy.name} appeared!")
+        self.update_score_display()
+        
+        self.txt_log.config(state=tk.NORMAL)
+        self.txt_log.delete(1.0, tk.END)
+        self.txt_log.config(state=tk.DISABLED)
+        
+        self.log_message(f"Go {self.player.name}! Choose your move...")
+        self.update_move_buttons()
+        self.update_display()
+        self.enable_moves()
+
+    def open_choice_dialog(self) -> None:
+        """Prompt player to choose a Pokémon before the match starts."""
+        win = tk.Toplevel(self.root)
+        win.title("Choose Your Pokémon")
+        win.grab_set()
+        tk.Label(win, text="Choose your Pokémon:", font=("Arial", 12, "bold")).pack(pady=8)
+
+        frame = tk.Frame(win)
+        frame.pack(padx=10, pady=10)
+
+        def choose(mon: Pokemon) -> None:
+            self.player_template = mon
+            win.destroy()
+            self.start_new_round()
+
+        for i, mon in enumerate(ROSTER):
+            moves = ", ".join(m.name for m in mon.moves)
+            text = f"{mon.name} [{mon.ptype}]\nHP {mon.max_hp}\nMoves: {moves}"
+            btn = tk.Button(frame, text=text, width=22, height=4, command=lambda m=mon: choose(m))
+            btn.grid(row=0, column=i, padx=6)
+
+    def format_hp(self, pokemon: Pokemon, label: str) -> str:
+        hp_percent = pokemon.hp / pokemon.max_hp if pokemon.max_hp > 0 else 0
+        bar_length = 20
+        filled = int(bar_length * hp_percent)
+        bar = "█" * filled + "░" * (bar_length - filled)
+        return f"{label}: {pokemon.name:<10} [{pokemon.ptype}] {bar} {pokemon.hp}/{pokemon.max_hp} HP"
+
+    def log_message(self, message: str) -> None:
+        self.txt_log.config(state=tk.NORMAL)
+        self.txt_log.insert(tk.END, message + "\n")
+        self.txt_log.see(tk.END)
+        self.txt_log.config(state=tk.DISABLED)
+
+    def update_display(self) -> None:
+        self.lbl_player_hp.config(text=self.format_hp(self.player, "You"))
+        self.lbl_enemy_hp.config(text=self.format_hp(self.enemy, "Foe"))
+
+    def update_score_display(self) -> None:
+        self.lbl_score.config(text=f"Score: You {self.player_wins} - {self.enemy_wins} Foe")
+
+    def update_move_buttons(self) -> None:
+        for i, move in enumerate(self.player.moves):
+            btn = self.move_buttons[i]
+            btn.config(text=f"{move.name}\n({move.mtype} {move.power})",
+                       command=lambda idx=i: self.on_move_click(idx))
+
+    def disable_moves(self) -> None:
+        for btn in self.move_buttons:
+            btn.config(state=tk.DISABLED)
+
+    def enable_moves(self) -> None:
+        for btn in self.move_buttons:
+            btn.config(state=tk.NORMAL)
+
+    def describe_result(self, attacker: Pokemon, move: Move, result: dict, target: str) -> str:
+        if result["missed"]:
+            return f"{attacker.name} used {move.name}, but it missed!"
+        
+        parts = []
+        if result["crit"]:
+            parts.append("Critical hit!")
+        if result["mult"] > 1.0:
+            parts.append("Super effective!")
+        elif 0 < result["mult"] < 1.0:
+            parts.append("Not very effective...")
+        
+        extra = " " + " ".join(parts) if parts else ""
+        return f"{attacker.name} used {move.name}! Dealt {result['damage']} damage to {target}.{extra}"
+
+    def on_move_click(self, move_idx: int) -> None:
+        if self.player.hp <= 0 or self.enemy.hp <= 0:
+            return
+
+        self.disable_moves()
+
+        # Player turn
+        move = self.player.moves[move_idx]
+        result = deal_damage(self.player, self.enemy, move)
+        msg = self.describe_result(self.player, move, result, self.enemy.name)
+        self.log_message(msg)
+        self.update_display()
+
+        if self.enemy.hp <= 0:
+            self.handle_round_end(player_won=True)
+            return
+
+        # Enemy turn (delayed for readability)
+        self.root.after(800, self.enemy_turn)
+
+    def enemy_turn(self) -> None:
+        if self.enemy.hp <= 0 or self.player.hp <= 0:
+            return
+
+        move = choose_enemy_move(self.enemy)
+        result = deal_damage(self.enemy, self.player, move)
+        msg = self.describe_result(self.enemy, move, result, self.player.name)
+        self.log_message(msg)
+        self.update_display()
+
+        if self.player.hp <= 0:
+            self.handle_round_end(player_won=False)
+            return
+
+        self.enable_moves()
+
+    def handle_round_end(self, player_won: bool) -> None:
+        if player_won:
+            self.player_wins += 1
+            self.log_message(f"\n🎉 {self.enemy.name} fainted! You win this round! 🎉")
         else:
-            ties += 1
+            self.enemy_wins += 1
+            self.log_message(f"\n💀 {self.player.name} fainted! You lost this round! 💀")
+        
+        self.update_score_display()
 
-        # Persist record after each battle
-        rec = {"wins": wins, "losses": losses, "ties": ties}
-        save_record(rec)
+        if self.player_wins >= 2:
+            self.log_message("\n🏆 You won the match! Congratulations! 🏆")
+            self.disable_moves()
+            self.record["wins"] += 1
+            self.save_record()
+            self.update_record_label()
+        elif self.enemy_wins >= 2:
+            self.log_message("\n💔 You lost the match! Better luck next time. 💔")
+            self.disable_moves()
+            self.record["losses"] += 1
+            self.save_record()
+            self.update_record_label()
+        else:
+            # Start next round after a delay
+            self.log_message("Prepare for the next round...")
+            self.root.after(2000, self.start_new_round)
 
-        print(f"Record: {wins} win(s), {losses} loss(es), {ties} tie(s)")
+    def restart(self) -> None:
+        self.player_wins = 0
+        self.enemy_wins = 0
+        self.round_num = 0
+        # Ask the user to choose their Pokémon at the start of each match
+        self.open_choice_dialog()
 
-        again = input("Play again? (y/n): ").strip().lower()
-        if again not in {"y", "yes"}:
-            print("Thanks for playing!")
-            # Save on exit as well
-            save_record({"wins": wins, "losses": losses, "ties": ties})
-            break
+
+def main() -> None:
+    root = tk.Tk()
+    BattleApp(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
