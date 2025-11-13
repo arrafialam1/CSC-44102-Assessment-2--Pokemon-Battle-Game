@@ -86,7 +86,7 @@ def choose_enemy_move(p: Pokemon) -> Move:
 class BattleApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        root.title("Pokemon Battle - Potions (Best of 3)")
+        root.title("Pokemon Battle - Hotkeys (Best of 3)")
         root.resizable(False, False)
 
         # Match state (best of 3)
@@ -94,13 +94,12 @@ class BattleApp:
         self.enemy_wins = 0
         self.round_num = 0
 
-        # Party templates kept for the match; cloned each round
+        # Create combatants - party templates kept for match
         p1, p2, _ = random.sample(ROSTER, 3)
         self.party_templates: List[Pokemon] = [p1, p2]
         self.party: List[Pokemon] = [clone_pokemon(p1), clone_pokemon(p2)]
         self.active_idx = 0
         self.player: Pokemon = self.party[self.active_idx]
-        # Enemy per round
         self.enemy: Pokemon = clone_pokemon(random.choice(ROSTER))
         self.potion_count = 2  # Potions reset each round
         # Persistent record
@@ -111,7 +110,6 @@ class BattleApp:
         self.lbl_title.pack(pady=10)
         self.lbl_score = tk.Label(root, text="", font=("Arial", 12, "italic"), fg="#34495e")
         self.lbl_score.pack(pady=(0, 6))
-
         # Record label
         self.lbl_record = tk.Label(root, text="", font=("Arial", 11), fg="#7f8c8d")
         self.lbl_record.pack(pady=(0, 6))
@@ -162,8 +160,19 @@ class BattleApp:
                                      width=15, font=("Arial", 9), bg="#27ae60", fg="white")
         self.btn_restart.grid(row=0, column=2, padx=5)
 
+        # Keyboard hotkeys
+        root.bind("1", lambda e: self.on_move_click(0))
+        root.bind("2", lambda e: self.on_move_click(1))
+        root.bind("3", lambda e: self.on_move_click(2))
+        root.bind("p", lambda e: self.on_potion())
+        root.bind("P", lambda e: self.on_potion())
+        root.bind("s", lambda e: self.on_switch())
+        root.bind("S", lambda e: self.on_switch())
+        root.bind("r", lambda e: self.restart())
+        root.bind("R", lambda e: self.restart())
+
         self.update_record_label()
-        # Begin match
+        # Start match
         self.restart()
 
     # ---------- Persistence ----------
@@ -211,24 +220,21 @@ class BattleApp:
         self.txt_log.config(state=tk.DISABLED)
 
     def start_new_round(self) -> None:
-        # Increment round and reset state
         self.round_num += 1
         self.party = [clone_pokemon(t) for t in self.party_templates]
         self.active_idx = 0
         self.player = self.party[self.active_idx]
-        # Reset potions each round
         self.potion_count = 2
         self.btn_potion.config(text=f"Potion (+15 HP) [{self.potion_count}]", state=tk.NORMAL)
-        # New enemy
         enemy_candidates = [m for m in ROSTER if m.name not in {t.name for t in self.party_templates}] or ROSTER
         self.enemy = clone_pokemon(random.choice(enemy_candidates))
 
-        # UI updates
         self.lbl_title.config(text=f"Round {self.round_num} - A wild {self.enemy.name} appeared!")
         self.update_score_label()
-        for i, move in enumerate(self.player.moves):
+
+        for i, mv in enumerate(self.player.moves):
             if i < len(self.move_buttons):
-                self.move_buttons[i].config(text=f"{move.name}\n({move.mtype} {move.power})",
+                self.move_buttons[i].config(text=f"{mv.name}\n({mv.mtype} {mv.power})",
                                             command=lambda idx=i: self.on_move_click(idx))
         self.txt_log.config(state=tk.NORMAL)
         self.txt_log.delete(1.0, tk.END)
@@ -236,6 +242,7 @@ class BattleApp:
         self.update_display()
         self.open_choice_dialog()
         self.log_message("Battle started! Choose your move...")
+        self.log_message("Hotkeys: 1-3 (moves), P (potion), S (switch), R (restart)")
         self.enable_moves()
 
     def update_display(self) -> None:
@@ -400,18 +407,17 @@ class BattleApp:
         self.enable_moves()
 
     def restart(self) -> None:
-        # Reset match
+        # Reset match state
         self.player_wins = 0
         self.enemy_wins = 0
         self.round_num = 0
-        # Choose a fresh party for the match
+        # New party for match
         p1, p2, _ = random.sample(ROSTER, 3)
         self.party_templates = [p1, p2]
         # Start first round
         self.start_new_round()
 
     def _end_round(self, player_won: bool | None) -> None:
-        # Update match score
         if player_won is True:
             self.player_wins += 1
         elif player_won is False:
@@ -419,7 +425,6 @@ class BattleApp:
         self.update_score_label()
         self.disable_moves()
 
-        # Match end?
         if self.player_wins >= 2:
             self.log_message("\n🏆 You won the match! Congratulations! 🏆")
             self.record['wins'] += 1
@@ -437,7 +442,6 @@ class BattleApp:
         self.root.after(1800, self.start_new_round)
 
     def open_choice_dialog(self) -> None:
-        # Choose lead Pokémon from party
         win = tk.Toplevel(self.root)
         win.title("Choose Your Lead Pokémon")
         win.grab_set()
