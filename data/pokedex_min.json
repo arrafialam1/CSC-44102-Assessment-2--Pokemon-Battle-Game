@@ -1,0 +1,124 @@
+{
+  "pokemon": [
+    {
+      "name": "Bulbasaur",
+      "type": "Grass",
+      "hp": 58,
+      "moves": [
+        {"name": "Tackle", "type": "Normal", "power": 10, "accuracy": 100},
+        {"name": "Vine Whip", "type": "Grass", "power": 14, "accuracy": 95},
+        {"name": "Razor Leaf", "type": "Grass", "power": 16, "accuracy": 95}
+      ]
+    },
+    {
+      "name": "Ivysaur",
+      "type": "Grass",
+      "hp": 68,
+      "moves": [
+        {"name": "Tackle", "type": "Normal", "power": 10, "accuracy": 100},
+        {"name": "Vine Whip", "type": "Grass", "power": 14, "accuracy": 95},
+        {"name": "Seed Bomb", "type": "Grass", "power": 18, "accuracy": 90}
+      ]
+    },
+    {
+      "name": "Charmander",
+      "type": "Fire",
+      "hp": 60,
+      "moves": [
+        {"name": "Scratch", "type": "Normal", "power": 10, "accuracy": 100},
+        {"name": "Ember", "type": "Fire", "power": 14, "accuracy": 95},
+        {"name": "Flame Burst", "type": "Fire", "power": 18, "accuracy": 90}
+      ]
+    },
+    {
+      "name": "Charmeleon",
+      "type": "Fire",
+      "hp": 70,
+      "moves": [
+        {"name": "Slash", "type": "Normal", "power": 12, "accuracy": 100},
+        {"name": "Ember", "type": "Fire", "power": 14, "accuracy": 95},
+        {"name": "Flamethrower", "type": "Fire", "power": 20, "accuracy": 90}
+      ]
+    },
+    {
+      "name": "Squirtle",
+      "type": "Water",
+      "hp": 62,
+      "moves": [
+        {"name": "Tackle", "type": "Normal", "power": 10, "accuracy": 100},
+        {"name": "Water Gun", "type": "Water", "power": 14, "accuracy": 95},
+        {"name": "Bubble", "type": "Water", "power": 12, "accuracy": 100}
+      ]
+    },
+    {
+      "name": "Wartortle",
+      "type": "Water",
+      "hp": 72,
+      "moves": [
+        {"name": "Headbutt", "type": "Normal", "power": 12, "accuracy": 95},
+        {"name": "Water Gun", "type": "Water", "power": 14, "accuracy": 95},
+        {"name": "Aqua Jet", "type": "Water", "power": 16, "accuracy": 95}
+      ]
+    },
+    {
+      "name": "Pikachu",
+      "type": "Electric",
+      "hp": 55,
+      "moves": [
+        {"name": "Quick Attack", "type": "Normal", "power": 12, "accuracy": 100},
+        {"name": "Thunder Shock", "type": "Electric", "power": 16, "accuracy": 95},
+        {"name": "Swift", "type": "Normal", "power": 14, "accuracy": 100}
+      ]
+    },
+    {
+      "name": "Eevee",
+      "type": "Normal",
+      "hp": 60,
+      "moves": [
+        {"name": "Quick Attack", "type": "Normal", "power": 12, "accuracy": 100},
+        {"name": "Tackle", "type": "Normal", "power": 10, "accuracy": 100},
+        {"name": "Bite", "type": "Normal", "power": 16, "accuracy": 95}
+      ]
+    },
+    {
+      "name": "Jigglypuff",
+      "type": "Normal",
+      "hp": 75,
+      "moves": [
+        {"name": "Pound", "type": "Normal", "power": 10, "accuracy": 100},
+        {"name": "Double Slap", "type": "Normal", "power": 12, "accuracy": 90},
+        {"name": "Body Slam", "type": "Normal", "power": 18, "accuracy": 85}
+      ]
+    },
+    {
+      "name": "Oddish",
+      "type": "Grass",
+      "hp": 56,
+      "moves": [
+        {"name": "Absorb", "type": "Grass", "power": 12, "accuracy": 100},
+        {"name": "Acid", "type": "Normal", "power": 10, "accuracy": 95},
+        {"name": "Razor Leaf", "type": "Grass", "power": 16, "accuracy": 95}
+      ]
+    },
+    {
+      "name": "Bellsprout",
+      "type": "Grass",
+      "hp": 54,
+      "moves": [
+        {"name": "Vine Whip", "type": "Grass", "power": 14, "accuracy": 95},
+        {"name": "Wrap", "type": "Normal", "power": 10, "accuracy": 90},
+        {"name": "Acid", "type": "Normal", "power": 10, "accuracy": 95}
+      ]
+    },
+    {
+      "name": "Poliwag",
+      "type": "Water",
+      "hp": 58,
+      "moves": [
+        {"name": "Bubble", "type": "Water", "power": 12, "accuracy": 100},
+        {"name": "Water Gun", "type": "Water", "power": 14, "accuracy": 95},
+        {"name": "Pound", "type": "Normal", "power": 10, "accuracy": 100}
+      ]
+    }
+  ]
+}
